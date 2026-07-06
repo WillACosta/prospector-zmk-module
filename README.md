@@ -43,11 +43,19 @@ CONFIG_ZMK_STATUS_ADV_IDLE_INTERVAL_MS=30000
 CONFIG_ZMK_STATUS_ADV_ACTIVITY_TIMEOUT_MS=5000
 
 # Split keyboard: specify central side (default: RIGHT)
+# "LEFT" / "RIGHT": central is that keyboard half
+# "AUX": central is neither half (e.g. trackball unit as central);
+#        both halves are peripherals and the central's battery is
+#        shown in the Aux1 slot
 CONFIG_ZMK_STATUS_ADV_CENTRAL_SIDE="LEFT"
 
 # Split keyboard: peripheral slot mapping (for 3+ device setups)
 # CONFIG_ZMK_STATUS_ADV_HALF_PERIPHERAL=1
 # CONFIG_ZMK_STATUS_ADV_AUX1_PERIPHERAL=0
+
+# CENTRAL_SIDE="AUX" only: which peripheral index is each keyboard half
+# CONFIG_ZMK_STATUS_ADV_LEFT_PERIPHERAL=0
+# CONFIG_ZMK_STATUS_ADV_RIGHT_PERIPHERAL=1
 ```
 
 ### Compatibility

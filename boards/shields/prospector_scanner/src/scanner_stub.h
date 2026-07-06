@@ -67,15 +67,17 @@ bool scanner_get_keyboard_data(int index, struct zmk_status_adv_data *data,
 int scanner_get_active_keyboard_count(void);
 
 /**
- * @brief Get keyboard status pointer by index (LVGL timer context only)
+ * @brief Copy keyboard status by index (thread-safe snapshot)
  *
- * Returns a direct pointer to the keyboard status struct.
- * Safe because keyboards[] is only accessed from LVGL timer context.
+ * Copies the slot under the data mutex. keyboards[] is mutated on the
+ * system workqueue while the display runs on its own thread, so callers
+ * must never hold a pointer into the array - always use this copy API.
  *
  * @param index Keyboard index (0 to MAX_KEYBOARDS-1)
- * @return Pointer to keyboard status, NULL if inactive or invalid index
+ * @param out Destination for the snapshot
+ * @return true if the slot is active and copied, false otherwise
  */
-struct zmk_keyboard_status *scanner_get_keyboard_status(int index);
+bool scanner_copy_keyboard_status(int index, struct zmk_keyboard_status *out);
 
 /**
  * @brief Get the selected keyboard index

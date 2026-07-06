@@ -247,8 +247,8 @@ int zmk_status_scanner_register_callback(zmk_status_scanner_callback_t callback)
     return 0;
 }
 
-struct zmk_keyboard_status *zmk_status_scanner_get_keyboard(int index) {
-    return scanner_get_keyboard_status(index);
+bool zmk_status_scanner_copy_keyboard(int index, struct zmk_keyboard_status *out) {
+    return scanner_copy_keyboard_status(index, out);
 }
 
 int zmk_status_scanner_get_active_count(void) {
@@ -259,11 +259,11 @@ int zmk_status_scanner_get_primary_keyboard(void) {
     /* Find most recently seen keyboard in scanner_stub.c's keyboards[] */
     int primary = -1;
     uint32_t latest_seen = 0;
+    struct zmk_keyboard_status kbd;
 
     for (int i = 0; i < ZMK_STATUS_SCANNER_MAX_KEYBOARDS; i++) {
-        struct zmk_keyboard_status *kbd = scanner_get_keyboard_status(i);
-        if (kbd && kbd->last_seen > latest_seen) {
-            latest_seen = kbd->last_seen;
+        if (scanner_copy_keyboard_status(i, &kbd) && kbd.last_seen > latest_seen) {
+            latest_seen = kbd.last_seen;
             primary = i;
         }
     }
