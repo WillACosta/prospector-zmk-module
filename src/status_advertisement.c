@@ -716,6 +716,12 @@ static void build_manufacturer_payload(void) {
 #ifndef CONFIG_ZMK_STATUS_ADV_AUX2_PERIPHERAL
 #define CONFIG_ZMK_STATUS_ADV_AUX2_PERIPHERAL 2
 #endif
+#ifndef CONFIG_ZMK_STATUS_ADV_LEFT_PERIPHERAL
+#define CONFIG_ZMK_STATUS_ADV_LEFT_PERIPHERAL 0
+#endif
+#ifndef CONFIG_ZMK_STATUS_ADV_RIGHT_PERIPHERAL
+#define CONFIG_ZMK_STATUS_ADV_RIGHT_PERIPHERAL 1
+#endif
 
     // Get peripheral batteries using configurable indices
     uint8_t half_battery = peripheral_batteries[CONFIG_ZMK_STATUS_ADV_HALF_PERIPHERAL];
@@ -739,6 +745,17 @@ static void build_manufacturer_payload(void) {
         manufacturer_data.peripheral_battery[1] = aux1_battery;    // Aux1 (e.g., trackball)
         manufacturer_data.peripheral_battery[2] = aux2_battery;    // Aux2
         // battery_level already has central battery, no change needed
+    } else if (strcmp(central_side, "AUX") == 0) {
+        // Central is neither keyboard half (e.g. trackball unit as central).
+        // Both halves are peripherals; the central's own battery is shown
+        // in the Aux1 slot.
+        uint8_t central_battery = battery_level;
+        manufacturer_data.battery_level =                          // Left arc
+            peripheral_batteries[CONFIG_ZMK_STATUS_ADV_LEFT_PERIPHERAL];
+        manufacturer_data.peripheral_battery[0] =                  // Right arc
+            peripheral_batteries[CONFIG_ZMK_STATUS_ADV_RIGHT_PERIPHERAL];
+        manufacturer_data.peripheral_battery[1] = central_battery; // Aux1 = central itself
+        manufacturer_data.peripheral_battery[2] = aux2_battery;    // Aux2
     } else {
         // Central is on RIGHT physical side (default)
         // battery_level (LEFT arc) = peripheral half (swap needed)
