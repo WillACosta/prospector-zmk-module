@@ -3154,15 +3154,15 @@ static void ks_update_entries(void) {
 
     uint8_t scanner_ch = scanner_get_runtime_channel();
 
+    struct zmk_keyboard_status kbd;
     for (int i = 0; i < CONFIG_PROSPECTOR_MAX_KEYBOARDS && active_count < KS_MAX_KEYBOARDS; i++) {
-        struct zmk_keyboard_status *kbd = zmk_status_scanner_get_keyboard(i);
-        if (!kbd || !kbd->active) continue;
+        if (!zmk_status_scanner_copy_keyboard(i, &kbd)) continue;
 
         /* Channel filtering:
          *   scanner_ch = CHANNEL_ALL (10): Show all keyboards
          *   scanner_ch = 0-9: Only show keyboards with matching channel
          */
-        if (scanner_ch != CHANNEL_ALL && kbd->data.channel != scanner_ch) {
+        if (scanner_ch != CHANNEL_ALL && kbd.data.channel != scanner_ch) {
             continue;  /* Skip keyboards that don't match filter */
         }
 
@@ -3206,23 +3206,21 @@ static void ks_update_entries(void) {
 
         for (int i = 0; i < active_count; i++) {
             int kbd_idx = active_keyboards[i];
-            struct zmk_keyboard_status *kbd = zmk_status_scanner_get_keyboard(kbd_idx);
-            if (!kbd) continue;
+            if (!zmk_status_scanner_copy_keyboard(kbd_idx, &kbd)) continue;
 
-            const char *name = kbd->ble_name[0] ? kbd->ble_name : "Unknown";
-            uint8_t channel = kbd->data.channel;  /* Get keyboard's channel */
-            ks_create_entry(i, y_pos + (i * spacing), kbd_idx, name, kbd->rssi, channel);
+            const char *name = kbd.ble_name[0] ? kbd.ble_name : "Unknown";
+            uint8_t channel = kbd.data.channel;  /* Get keyboard's channel */
+            ks_create_entry(i, y_pos + (i * spacing), kbd_idx, name, kbd.rssi, channel);
         }
         ks_entry_count = active_count;
     } else {
         /* Just update existing entries (same channel filter as creation path) */
         int entry_idx = 0;
         for (int i = 0; i < CONFIG_PROSPECTOR_MAX_KEYBOARDS && entry_idx < ks_entry_count; i++) {
-            struct zmk_keyboard_status *kbd = zmk_status_scanner_get_keyboard(i);
-            if (!kbd || !kbd->active) continue;
+            if (!zmk_status_scanner_copy_keyboard(i, &kbd)) continue;
 
             /* Apply same channel filter as creation path */
-            if (scanner_ch != CHANNEL_ALL && kbd->data.channel != scanner_ch) {
+            if (scanner_ch != CHANNEL_ALL && kbd.data.channel != scanner_ch) {
                 continue;
             }
 
@@ -3233,15 +3231,15 @@ static void ks_update_entries(void) {
             }
 
             /* Update name */
-            const char *name = kbd->ble_name[0] ? kbd->ble_name : "Unknown";
+            const char *name = kbd.ble_name[0] ? kbd.ble_name : "Unknown";
             lv_label_set_text(entry->name_label, name);
 
             /* Update RSSI */
-            uint8_t bars = ks_rssi_to_bars(kbd->rssi);
+            uint8_t bars = ks_rssi_to_bars(kbd.rssi);
             lv_bar_set_value(entry->rssi_bar, bars, LV_ANIM_OFF);
             lv_obj_set_style_bg_color(entry->rssi_bar, ks_get_rssi_color(bars), LV_PART_INDICATOR);
             char rssi_buf[16];
-            snprintf(rssi_buf, sizeof(rssi_buf), "%ddBm", kbd->rssi);
+            snprintf(rssi_buf, sizeof(rssi_buf), "%ddBm", kbd.rssi);
             lv_label_set_text(entry->rssi_label, rssi_buf);
 
             /* Update selection styling */
