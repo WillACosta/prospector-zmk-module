@@ -19,6 +19,7 @@
 #include <zmk/status_scanner.h>
 #include <zmk/status_advertisement.h>
 #include <lvgl.h>
+#include "scanner_stub.h"
 
 #if IS_ENABLED(CONFIG_ZMK_BATTERY_REPORTING)
 #include <zmk/battery.h>
@@ -38,7 +39,7 @@ extern int zmk_status_scanner_start(void);
 /* Uses struct zmk_keyboard_status from zmk/status_scanner.h as single source of truth */
 
 #define MAX_KEYBOARDS ZMK_STATUS_SCANNER_MAX_KEYBOARDS
-#define MAX_NAME_LEN 32
+#define MAX_NAME_LEN SCANNER_PENDING_DISPLAY_NAME_LEN
 
 static struct zmk_keyboard_status keyboards[MAX_KEYBOARDS];
 static int selected_keyboard = 0;
@@ -90,38 +91,10 @@ static bool incoming_pop(struct incoming_adv *out) {
 
 /* ========== Pending Display Data (set by LVGL timer, read by LVGL timer) ========== */
 
-struct pending_display_data {
-    volatile bool update_pending;
-    volatile bool signal_update_pending;  /* Signal widget updates separately (1Hz) */
-    volatile bool no_keyboards;           /* True when all keyboards timed out */
-
-    char device_name[MAX_NAME_LEN];
-    char layer_name[5];                   /* Null-terminated (4 chars + \0) */
-    int layer;
-    int wpm;
-    bool usb_ready;
-    bool ble_connected;
-    bool ble_bonded;
-    int profile;
-    uint8_t modifiers;
-    int bat[4];
-    int8_t rssi;
-    float rate_hz;
-    int scanner_battery;
-    bool scanner_battery_pending;
-
-    /* Keyboard firmware version (decoded from version + profile_slot fields) */
-    uint8_t kb_version_major;
-    uint8_t kb_version_minor;
-    uint8_t kb_version_patch;
-    bool kb_version_dev;
-    bool kb_version_valid;       /* True after first keyboard data received */
-};
-
-static struct pending_display_data pending_data = {0};
+static struct scanner_pending_display_data pending_data = {0};
 
 /* Getter for pending data - called from LVGL timer in main thread */
-bool scanner_get_pending_update(struct pending_display_data *out) {
+bool scanner_get_pending_update(struct scanner_pending_display_data *out) {
     if (!pending_data.update_pending) {
         return false;
     }
@@ -506,8 +479,9 @@ void scanner_process_incoming(void) {
             bool any_timed_out = false;
             for (int i = 0; i < MAX_KEYBOARDS; i++) {
                 if (keyboards[i].active &&
-                    (now - keyboards[i].last_seen) > 7000) {  /* 7-second offline timeout */
-                    LOG_INF("Keyboard in slot %d offline (no advertisements for 7s)", i);
+                    (now - keyboards[i].last_seen) > timeout_ms) {
+                    LOG_INF("Keyboard in slot %d timed out (no advertisements for %ums)",
+                            i, timeout_ms);
                     keyboards[i].active = false;
                     keyboards[i].ble_name[0] = '\0';
                     any_timed_out = true;

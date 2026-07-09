@@ -10,6 +10,35 @@
 #include <zmk/status_scanner.h>
 #include <zmk/status_advertisement.h>
 
+#define SCANNER_PENDING_DISPLAY_NAME_LEN 32
+
+struct scanner_pending_display_data {
+    volatile bool update_pending;
+    volatile bool signal_update_pending;
+    volatile bool no_keyboards;
+
+    char device_name[SCANNER_PENDING_DISPLAY_NAME_LEN];
+    char layer_name[5];
+    int layer;
+    int wpm;
+    bool usb_ready;
+    bool ble_connected;
+    bool ble_bonded;
+    int profile;
+    uint8_t modifiers;
+    int bat[4];
+    int8_t rssi;
+    float rate_hz;
+    int scanner_battery;
+    bool scanner_battery_pending;
+
+    uint8_t kb_version_major;
+    uint8_t kb_version_minor;
+    uint8_t kb_version_patch;
+    bool kb_version_dev;
+    bool kb_version_valid;
+};
+
 /**
  * @brief Send keyboard data received from BLE advertisement
  *
@@ -99,3 +128,9 @@ void scanner_set_selected_keyboard(int index);
  * @return 0 on success, negative error code on failure
  */
 int scanner_msg_send_display_refresh(void);
+
+bool scanner_get_pending_update(struct scanner_pending_display_data *out);
+bool scanner_is_signal_pending(void);
+bool scanner_get_pending_battery(int *level);
+bool scanner_get_kb_version(uint8_t *major, uint8_t *minor, uint8_t *patch,
+                            bool *is_dev, char *name, size_t name_len);

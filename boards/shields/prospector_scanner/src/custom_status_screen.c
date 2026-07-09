@@ -36,40 +36,14 @@
 #include "brightness_control.h"  /* For auto brightness sensor control */
 #include "display_settings.h"   /* NVS persistence for display settings */
 #include "prospector_layouts.h"  /* Carrefinho-inspired display layouts */
+#include "scanner_stub.h"
 
 LOG_MODULE_REGISTER(display_screen, LOG_LEVEL_INF);
 
-/* ========== Pending Display Data from scanner_stub.c ========== */
-/* Work queue sets data + flag, LVGL timer here processes it in main thread */
-#define MAX_NAME_LEN 32
-struct pending_display_data {
-    volatile bool update_pending;
-    volatile bool signal_update_pending;  /* Signal widget updates separately (1Hz) */
-    volatile bool no_keyboards;           /* True when all keyboards timed out */
-    char device_name[MAX_NAME_LEN];
-    char layer_name[4];
-    int layer;
-    int wpm;
-    bool usb_ready;
-    bool ble_connected;
-    bool ble_bonded;
-    int profile;
-    uint8_t modifiers;
-    int bat[4];
-    int8_t rssi;
-    float rate_hz;
-    int scanner_battery;
-    bool scanner_battery_pending;
-};
+#define MAX_NAME_LEN SCANNER_PENDING_DISPLAY_NAME_LEN
 
-/* Defined in scanner_stub.c */
-extern bool scanner_get_pending_update(struct pending_display_data *out);
-extern bool scanner_is_signal_pending(void);
 extern volatile int8_t scanner_signal_rssi;
 extern volatile int32_t scanner_signal_rate_x100;  /* rate * 100 */
-extern bool scanner_get_pending_battery(int *level);
-extern bool scanner_get_kb_version(uint8_t *major, uint8_t *minor, uint8_t *patch,
-                                    bool *is_dev, char *name, size_t name_len);
 
 /* LVGL timer for processing pending updates in main thread */
 static lv_timer_t *pending_update_timer = NULL;
@@ -533,7 +507,7 @@ static void pending_update_timer_cb(lv_timer_t *timer) {
     }
 
     /* Check for pending display update */
-    struct pending_display_data data;
+    struct scanner_pending_display_data data;
     if (scanner_get_pending_update(&data)) {
         /* Check if all keyboards have timed out */
         if (data.no_keyboards) {
