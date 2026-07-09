@@ -754,7 +754,10 @@ lv_obj_t *zmk_display_status_screen(void) {
     lv_obj_align(layer_title_label, LV_ALIGN_TOP_MID, 0, 82);  /* 3px up */
 
     /* Create layer display - slide mode OR fixed mode (list/over-max) */
-    if (ds_layer_slide_mode) {
+    if (IS_ENABLED(CONFIG_PROSPECTOR_LAYER_NAMES_SUPPORT)) {
+        layer_mode_over_max = true;
+        create_over_max_widget(screen, active_layer, 105);
+    } else if (ds_layer_slide_mode) {
         /* Slide mode: create 7-slot dial display */
         create_layer_slide_widgets(screen, 105);
         layer_mode_over_max = false;  /* Not used in slide mode */
@@ -1501,6 +1504,28 @@ void display_update_layer(int layer, const char *layer_name) {
         return;
     }
 
+    if (IS_ENABLED(CONFIG_PROSPECTOR_LAYER_NAMES_SUPPORT)) {
+        if (screen_obj) {
+            if (!layer_over_max_label) {
+                create_over_max_widget(screen_obj, layer, 105);
+            } else {
+                char text[12];
+                if (active_layer_name[0] != '\0') {
+                    snprintf(text, sizeof(text), "%s", active_layer_name);
+                } else {
+                    snprintf(text, sizeof(text), "%d", layer);
+                }
+                lv_label_set_text(layer_over_max_label, text);
+                lv_obj_set_style_text_color(layer_over_max_label, get_layer_color(layer % 10), 0);
+                if (prev_layer != layer) {
+                    start_pulse_anim(layer_over_max_label);
+                }
+            }
+        }
+        last_active_layer = layer;
+        return;
+    }
+
     /* ========== Slide Mode ========== */
     if (ds_layer_slide_mode) {
         /* Slide mode: just update the slide display, it handles everything */
@@ -2020,7 +2045,10 @@ static void create_main_screen_widgets(void) {
     lv_obj_align(layer_title_label, LV_ALIGN_TOP_MID, 0, 82);  /* 3px up */
 
     /* Create layer display - slide mode OR fixed mode (list/over-max) */
-    if (ds_layer_slide_mode) {
+    if (IS_ENABLED(CONFIG_PROSPECTOR_LAYER_NAMES_SUPPORT)) {
+        layer_mode_over_max = true;
+        create_over_max_widget(screen_obj, active_layer, 105);
+    } else if (ds_layer_slide_mode) {
         /* Slide mode: create 7-slot dial display */
         create_layer_slide_widgets(screen_obj, 105);
         layer_mode_over_max = false;  /* Not used in slide mode */
