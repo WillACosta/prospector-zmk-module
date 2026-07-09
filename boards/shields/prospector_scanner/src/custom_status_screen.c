@@ -115,7 +115,7 @@ static void swipe_process_timer_cb(lv_timer_t *timer);
 
 /* Display update functions - called from pending_update_timer_cb */
 void display_update_device_name(const char *name);
-void display_update_layer(int layer);
+void display_update_layer(int layer, const char *layer_name);
 void display_update_wpm(int wpm);
 void display_update_connection(bool usb_rdy, bool ble_conn, bool ble_bond, int profile);
 void display_update_modifiers(uint8_t mods);
@@ -167,6 +167,7 @@ static const char *mod_symbols[4] = {
 
 /* ========== Cached data (updated by scanner, preserved across screen transitions) ========== */
 static int active_layer = 0;
+static char active_layer_name[8] = "";
 static int wpm_value = 0;
 #define MAX_KB_BATTERIES 4
 static int battery_values[MAX_KB_BATTERIES] = {0, 0, 0, 0};  /* Up to 4 keyboard batteries */
@@ -540,7 +541,7 @@ static void pending_update_timer_cb(lv_timer_t *timer) {
 
             /* Reset display to initial "Scanning..." state */
             display_update_device_name("Scanning...");
-            display_update_layer(0);
+            display_update_layer(0, NULL);
             display_update_wpm(0);
             display_update_connection(false, false, false, 0);
             display_update_modifiers(0);
@@ -599,7 +600,7 @@ static void pending_update_timer_cb(lv_timer_t *timer) {
         } else {
             /* SCREEN_MAIN: Update YADS-style widgets */
             display_update_device_name(data.device_name);
-            display_update_layer(data.layer);
+            display_update_layer(data.layer, data.layer_name);
             display_update_wpm(data.wpm);
             display_update_connection(data.usb_ready, data.ble_connected,
                                       data.ble_bonded, data.profile);
@@ -704,6 +705,7 @@ lv_obj_t *zmk_display_status_screen(void) {
     }
     LOG_INF("[INIT] scanner battery created (visible=%d)", ds_battery_visible);
 
+#if IS_ENABLED(CONFIG_PROSPECTOR_WPM_SUPPORT)
     /* ===== 3. WPM Widget (TOP_LEFT, centered under title) ===== */
     LOG_INF("[INIT] Creating WPM...");
     wpm_title_label = lv_label_create(screen);
@@ -720,6 +722,7 @@ lv_obj_t *zmk_display_status_screen(void) {
     lv_label_set_text(wpm_value_label, "0");
     lv_obj_set_pos(wpm_value_label, 8, 66);  /* 3px down */
     LOG_INF("[INIT] WPM created");
+#endif
 
     /* ===== 4. Connection Status (TOP_RIGHT) ===== */
     LOG_INF("[INIT] Creating connection status...");
@@ -1040,25 +1043,41 @@ static void create_layer_list_widgets(lv_obj_t *parent, int y_offset) {
 
     for (int i = 0; i < num_layers && i < 10; i++) {
         layer_labels[i] = lv_label_create(parent);
-        lv_obj_set_style_text_font(layer_labels[i], &lv_font_montserrat_28, 0);
-        lv_obj_set_width(layer_labels[i], label_width);
+        
+        bool is_active = (i == active_layer);
+        int current_label_width = label_width;
+        
+        if (is_active && IS_ENABLED(CONFIG_PROSPECTOR_LAYER_NAMES_SUPPORT) && active_layer_name[0] != '\0') {
+            lv_obj_set_style_text_font(layer_labels[i], &lv_font_montserrat_16, 0);
+            current_label_width = 60;
+        } else {
+            lv_obj_set_style_text_font(layer_labels[i], &lv_font_montserrat_28, 0);
+        }
+        
+        lv_obj_set_width(layer_labels[i], current_label_width);
         lv_obj_set_style_text_align(layer_labels[i], LV_TEXT_ALIGN_CENTER, 0);
         /* Enable transform for pulse animation */
-        lv_obj_set_style_transform_pivot_x(layer_labels[i], label_width / 2, 0);
+        lv_obj_set_style_transform_pivot_x(layer_labels[i], current_label_width / 2, 0);
         lv_obj_set_style_transform_pivot_y(layer_labels[i], 14, 0);  /* Half of font height */
 
-        char text[4];
-        snprintf(text, sizeof(text), "%d", i);
+        char text[12];
+        if (is_active && IS_ENABLED(CONFIG_PROSPECTOR_LAYER_NAMES_SUPPORT) && active_layer_name[0] != '\0') {
+            snprintf(text, sizeof(text), "%s", active_layer_name);
+        } else {
+            snprintf(text, sizeof(text), "%d", i);
+        }
         lv_label_set_text(layer_labels[i], text);
 
-        if (i == active_layer) {
+        if (is_active) {
             lv_obj_set_style_text_color(layer_labels[i], get_layer_color(i), 0);
             lv_obj_set_style_text_opa(layer_labels[i], LV_OPA_COVER, 0);
         } else {
             lv_obj_set_style_text_color(layer_labels[i], lv_color_make(40, 40, 40), 0);
             lv_obj_set_style_text_opa(layer_labels[i], LV_OPA_30, 0);
         }
-        lv_obj_set_pos(layer_labels[i], start_x + (i * spacing), y_offset);
+        
+        int x_pos = start_x + (i * spacing) - (current_label_width / 2) + (label_width / 2);
+        lv_obj_set_pos(layer_labels[i], x_pos, y_offset);
     }
 }
 
@@ -1235,7 +1254,10 @@ static int get_slide_slot_x_offset(int slot) {
 #define SLIDE_LABEL_WIDTH_LARGE 34  /* Width for center slots (large font) */
 
 /* Get label width for slot based on font size */
-static int get_slide_label_width(int slot) {
+static int get_slide_label_width(int slot, int layer_num) {
+    if (layer_num == active_layer && layer_num >= 0 && IS_ENABLED(CONFIG_PROSPECTOR_LAYER_NAMES_SUPPORT) && active_layer_name[0] != '\0') {
+        return 60;
+    }
     if (slot == 0 || slot == 8) {
         return SLIDE_LABEL_WIDTH_SMALL;
     } else if (slot == 1 || slot == 7) {
@@ -1258,12 +1280,16 @@ static void create_layer_slide_widgets(lv_obj_t *parent, int y_offset) {
     for (int i = 0; i < SLIDE_VISIBLE_COUNT; i++) {
         int layer_num = layer_slide_window_start + i;
         bool is_active = (layer_num == active_layer && layer_num >= 0);
-        int label_width = get_slide_label_width(i);
+        int label_width = get_slide_label_width(i, layer_num);
 
         layer_slide_labels[i] = lv_label_create(parent);
 
         /* Font size based on gradient position */
-        lv_obj_set_style_text_font(layer_slide_labels[i], get_slide_slot_font(i), 0);
+        if (is_active && IS_ENABLED(CONFIG_PROSPECTOR_LAYER_NAMES_SUPPORT) && active_layer_name[0] != '\0') {
+            lv_obj_set_style_text_font(layer_slide_labels[i], &lv_font_montserrat_16, 0);
+        } else {
+            lv_obj_set_style_text_font(layer_slide_labels[i], get_slide_slot_font(i), 0);
+        }
 
         /* Fixed width and center alignment for uniform spacing */
         lv_obj_set_width(layer_slide_labels[i], label_width);
@@ -1287,7 +1313,9 @@ static void create_layer_slide_widgets(lv_obj_t *parent, int y_offset) {
 
         /* Set label text (layer number or empty for negative) */
         char text[12];
-        if (layer_num >= 0) {
+        if (is_active && IS_ENABLED(CONFIG_PROSPECTOR_LAYER_NAMES_SUPPORT) && active_layer_name[0] != '\0') {
+            snprintf(text, sizeof(text), "%s", active_layer_name);
+        } else if (layer_num >= 0) {
             snprintf(text, sizeof(text), "%d", layer_num);
         } else {
             text[0] = '\0';  /* Empty for negative */
@@ -1327,7 +1355,8 @@ static void slide_reset_positions(void) {
 
     for (int i = 0; i < SLIDE_VISIBLE_COUNT; i++) {
         if (layer_slide_labels[i]) {
-            int label_width = get_slide_label_width(i);
+            int layer_num = layer_slide_window_start + i;
+            int label_width = get_slide_label_width(i, layer_num);
             int y_adj = get_slide_slot_y_adj(i);
             int x_offset = get_slide_slot_x_offset(i);
             int x_pos = start_x + (i * SLIDE_SLOT_SPACING) - (label_width / 2) + x_offset;
@@ -1386,8 +1415,10 @@ static void update_layer_slide_display(int layer, bool animate) {
         bool is_active = (layer_num == layer && layer_num >= 0);
 
         /* Update text */
-        char text[8];
-        if (layer_num >= 0) {
+        char text[12];
+        if (is_active && IS_ENABLED(CONFIG_PROSPECTOR_LAYER_NAMES_SUPPORT) && active_layer_name[0] != '\0') {
+            snprintf(text, sizeof(text), "%s", active_layer_name);
+        } else if (layer_num >= 0) {
             snprintf(text, sizeof(text), "%d", layer_num);
         } else {
             text[0] = '\0';  /* Empty for negative */
@@ -1400,6 +1431,11 @@ static void update_layer_slide_display(int layer, bool animate) {
             lv_obj_set_style_text_opa(layer_slide_labels[i], LV_OPA_TRANSP, 0);
         } else if (is_active) {
             /* Active layer = Hue-based color, full opacity */
+            if (IS_ENABLED(CONFIG_PROSPECTOR_LAYER_NAMES_SUPPORT) && active_layer_name[0] != '\0') {
+                lv_obj_set_style_text_font(layer_slide_labels[i], &lv_font_montserrat_16, 0);
+            } else {
+                lv_obj_set_style_text_font(layer_slide_labels[i], get_slide_slot_font(i), 0);
+            }
             lv_obj_set_style_text_color(layer_slide_labels[i],
                 get_slide_layer_color(layer_num, ds_layer_slide_max), 0);
             lv_obj_set_style_text_opa(layer_slide_labels[i], LV_OPA_COVER, 0);
@@ -1410,6 +1446,7 @@ static void update_layer_slide_display(int layer, bool animate) {
             }
         } else {
             /* Inactive = gray with gradient opacity based on slot position */
+            lv_obj_set_style_text_font(layer_slide_labels[i], get_slide_slot_font(i), 0);
             lv_obj_set_style_text_color(layer_slide_labels[i], lv_color_make(80, 80, 80), 0);
             lv_obj_set_style_text_opa(layer_slide_labels[i], get_slide_slot_opa(i), 0);
         }
@@ -1446,8 +1483,15 @@ static void update_layer_slide_display(int layer, bool animate) {
             layer, layer_slide_window_start, layer - layer_slide_window_start, scroll_slots);
 }
 
-void display_update_layer(int layer) {
+void display_update_layer(int layer, const char *layer_name) {
     if (layer < 0 || layer > 255) return;
+
+    if (layer_name) {
+        strncpy(active_layer_name, layer_name, sizeof(active_layer_name) - 1);
+        active_layer_name[sizeof(active_layer_name) - 1] = '\0';
+    } else {
+        active_layer_name[0] = '\0';
+    }
 
     int prev_layer = active_layer;
     active_layer = layer;  /* Always cache the value */
@@ -1523,9 +1567,35 @@ void display_update_layer(int layer) {
         }
     }
     else {
-        /* Update normal layer list - just update colors, pulse on active */
+        /* Update normal layer list - just update colors, pulse on active, update text/width/pos */
+        int num_layers = ds_max_layers;
+        int spacing = 25;
+        int label_width = 22;
+        int start_x = 140 - ((num_layers - 1) * spacing / 2) - (label_width / 2);
+
         for (int i = 0; i < ds_max_layers && i < 10 && layer_labels[i]; i++) {
-            if (i == active_layer) {
+            bool is_active = (i == active_layer);
+            int current_label_width = label_width;
+
+            if (is_active && IS_ENABLED(CONFIG_PROSPECTOR_LAYER_NAMES_SUPPORT) && active_layer_name[0] != '\0') {
+                lv_obj_set_style_text_font(layer_labels[i], &lv_font_montserrat_16, 0);
+                current_label_width = 60;
+            } else {
+                lv_obj_set_style_text_font(layer_labels[i], &lv_font_montserrat_28, 0);
+            }
+
+            lv_obj_set_width(layer_labels[i], current_label_width);
+            lv_obj_set_style_transform_pivot_x(layer_labels[i], current_label_width / 2, 0);
+
+            char text[12];
+            if (is_active && IS_ENABLED(CONFIG_PROSPECTOR_LAYER_NAMES_SUPPORT) && active_layer_name[0] != '\0') {
+                snprintf(text, sizeof(text), "%s", active_layer_name);
+            } else {
+                snprintf(text, sizeof(text), "%d", i);
+            }
+            lv_label_set_text(layer_labels[i], text);
+
+            if (is_active) {
                 lv_obj_set_style_text_color(layer_labels[i], get_layer_color(i), 0);
                 lv_obj_set_style_text_opa(layer_labels[i], LV_OPA_COVER, 0);
 
@@ -1537,6 +1607,9 @@ void display_update_layer(int layer) {
                 lv_obj_set_style_text_color(layer_labels[i], lv_color_make(40, 40, 40), 0);
                 lv_obj_set_style_text_opa(layer_labels[i], LV_OPA_30, 0);
             }
+
+            int x_pos = start_x + (i * spacing) - (current_label_width / 2) + (label_width / 2);
+            lv_obj_set_pos(layer_labels[i], x_pos, layer_y);
         }
     }
 
@@ -1866,8 +1939,10 @@ static void destroy_main_screen_widgets(void) {
     if (layer_title_label) { lv_obj_del(layer_title_label); layer_title_label = NULL; }
     if (ble_profile_label) { lv_obj_del(ble_profile_label); ble_profile_label = NULL; }
     if (transport_label) { lv_obj_del(transport_label); transport_label = NULL; }
+#if IS_ENABLED(CONFIG_PROSPECTOR_WPM_SUPPORT)
     if (wpm_value_label) { lv_obj_del(wpm_value_label); wpm_value_label = NULL; }
     if (wpm_title_label) { lv_obj_del(wpm_title_label); wpm_title_label = NULL; }
+#endif
     if (scanner_bat_pct) { lv_obj_del(scanner_bat_pct); scanner_bat_pct = NULL; }
     if (scanner_bat_icon) { lv_obj_del(scanner_bat_icon); scanner_bat_icon = NULL; }
     if (device_name_label) { lv_obj_del(device_name_label); device_name_label = NULL; }
@@ -1908,6 +1983,7 @@ static void create_main_screen_widgets(void) {
         lv_obj_set_style_opa(scanner_bat_pct, 0, 0);
     }
 
+#if IS_ENABLED(CONFIG_PROSPECTOR_WPM_SUPPORT)
     wpm_title_label = lv_label_create(screen_obj);
     lv_obj_set_style_text_font(wpm_title_label, &lv_font_unscii_8, 0);
     lv_obj_set_style_text_color(wpm_title_label, lv_color_make(0xA0, 0xA0, 0xA0), 0);
@@ -1921,6 +1997,7 @@ static void create_main_screen_widgets(void) {
     lv_obj_set_style_text_align(wpm_value_label, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_text(wpm_value_label, "0");
     lv_obj_set_pos(wpm_value_label, 8, 66);  /* 3px down */
+#endif
 
     transport_label = lv_label_create(screen_obj);
     lv_obj_set_style_text_font(transport_label, &lv_font_montserrat_12, 0);
@@ -2066,7 +2143,7 @@ static void create_main_screen_widgets(void) {
     display_update_scanner_battery(scanner_battery);
     display_update_wpm(wpm_value);
     display_update_connection(usb_ready, ble_connected, ble_bonded, ble_profile);
-    display_update_layer(active_layer);
+    display_update_layer(active_layer, active_layer_name);
     display_update_modifiers(cached_modifiers);
 
     /* Force battery widget reposition based on cached values */
