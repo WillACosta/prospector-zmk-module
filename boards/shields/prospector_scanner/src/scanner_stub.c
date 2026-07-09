@@ -96,7 +96,7 @@ struct pending_display_data {
     volatile bool no_keyboards;           /* True when all keyboards timed out */
 
     char device_name[MAX_NAME_LEN];
-    char layer_name[4];
+    char layer_name[5];                   /* Null-terminated (4 chars + \0) */
     int layer;
     int wpm;
     bool usb_ready;
@@ -252,7 +252,8 @@ static void fill_pending_from_selected(void) {
     d = &keyboards[selected_keyboard].data;
     strncpy(pending_data.device_name, keyboards[selected_keyboard].ble_name, MAX_NAME_LEN - 1);
     pending_data.device_name[MAX_NAME_LEN - 1] = '\0';
-    memcpy(pending_data.layer_name, d->layer_name, sizeof(pending_data.layer_name));
+    memcpy(pending_data.layer_name, d->layer_name, 4);
+    pending_data.layer_name[4] = '\0';
     pending_data.layer = d->active_layer;
     pending_data.wpm = d->wpm_value;
     pending_data.usb_ready = (d->status_flags & ZMK_STATUS_FLAG_USB_HID_READY) != 0;
@@ -295,11 +296,8 @@ static K_WORK_DELAYABLE_DEFINE(process_work, process_work_handler);
 static volatile bool process_pending = false;
 
 static void schedule_process(void) {
-    if (!process_pending) {
-        process_pending = true;
-        /* Batch rapid advertisements with 50ms delay (same as v2.1.0) */
-        k_work_schedule(&process_work, K_MSEC(50));
-    }
+    /* Reschedule to run in 5ms to process immediately and batch rapid packets */
+    k_work_reschedule(&process_work, K_MSEC(5));
 }
 
 /* ========== Rate Calculation State ========== */
@@ -508,8 +506,8 @@ void scanner_process_incoming(void) {
             bool any_timed_out = false;
             for (int i = 0; i < MAX_KEYBOARDS; i++) {
                 if (keyboards[i].active &&
-                    (now - keyboards[i].last_seen) > timeout_ms) {
-                    LOG_INF("Keyboard in slot %d timed out", i);
+                    (now - keyboards[i].last_seen) > 7000) {  /* 7-second offline timeout */
+                    LOG_INF("Keyboard in slot %d offline (no advertisements for 7s)", i);
                     keyboards[i].active = false;
                     keyboards[i].ble_name[0] = '\0';
                     any_timed_out = true;

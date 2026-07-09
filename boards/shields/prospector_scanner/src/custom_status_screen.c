@@ -957,8 +957,8 @@ lv_obj_t *zmk_display_status_screen(void) {
 
     /* Create pending update timer - processes Work Queue data in main thread */
     if (!pending_update_timer) {
-        pending_update_timer = lv_timer_create(pending_update_timer_cb, 100, NULL);
-        LOG_INF("Pending update timer registered (100ms interval)");
+        pending_update_timer = lv_timer_create(pending_update_timer_cb, 30, NULL);
+        LOG_INF("Pending update timer registered (30ms interval)");
     }
 
     return screen;
