@@ -129,6 +129,16 @@ void scanner_set_selected_keyboard(int index);
  */
 int scanner_msg_send_display_refresh(void);
 
+/**
+ * @brief Request ambient brightness sensor processing on the display thread.
+ *
+ * Called from the brightness control work queue; scanner_stub.c provides the
+ * display-thread handoff.
+ *
+ * @return 0 on success, negative error code on failure
+ */
+int scanner_msg_send_brightness_sensor_read(void);
+
 bool scanner_get_pending_update(struct scanner_pending_display_data *out);
 bool scanner_is_signal_pending(void);
 bool scanner_get_pending_battery(int *level);
