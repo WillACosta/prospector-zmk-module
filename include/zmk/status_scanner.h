@@ -85,12 +85,17 @@ int zmk_status_scanner_stop(void);
 int zmk_status_scanner_register_callback(zmk_status_scanner_callback_t callback);
 
 /**
- * @brief Get keyboard status by index
- * 
+ * @brief Copy keyboard status by index (thread-safe snapshot)
+ *
+ * The keyboard table is mutated on the system workqueue while the display
+ * runs on a dedicated thread, so status is returned as a copy taken under
+ * the internal mutex - never as a pointer into the live table.
+ *
  * @param index Keyboard index (0 to ZMK_STATUS_SCANNER_MAX_KEYBOARDS-1)
- * @return Pointer to keyboard status, NULL if invalid index
+ * @param out Destination for the snapshot
+ * @return true if the slot is active and copied, false otherwise
  */
-struct zmk_keyboard_status *zmk_status_scanner_get_keyboard(int index);
+bool zmk_status_scanner_copy_keyboard(int index, struct zmk_keyboard_status *out);
 
 /**
  * @brief Get the number of active keyboards

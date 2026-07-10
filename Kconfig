@@ -159,7 +159,32 @@ config ZMK_STATUS_ADV_CENTRAL_SIDE
       Specify which physical side the central device is on.
       RIGHT: Central is on the right side (default - most split keyboards)
       LEFT: Central is on the left side (e.g. some keyboards like Sweep)
+      AUX: Central is neither keyboard half (e.g. a trackball or other
+      auxiliary unit acting as split central). Both halves are then
+      peripherals: LEFT_PERIPHERAL fills the left battery slot,
+      RIGHT_PERIPHERAL fills the right battery slot, and the central's
+      own battery is shown in the Aux1 slot.
       This determines the battery display position in scanner devices.
+
+config ZMK_STATUS_ADV_LEFT_PERIPHERAL
+    int "Peripheral index for LEFT half (CENTRAL_SIDE=AUX only)"
+    default 0
+    range 0 2
+    depends on ZMK_STATUS_ADVERTISEMENT && ZMK_SPLIT
+    help
+      When CENTRAL_SIDE is "AUX", which peripheral index is the LEFT
+      keyboard half. Default is 0 (first connected peripheral).
+      Adjust if the peripheral connection order doesn't match the
+      physical layout.
+
+config ZMK_STATUS_ADV_RIGHT_PERIPHERAL
+    int "Peripheral index for RIGHT half (CENTRAL_SIDE=AUX only)"
+    default 1
+    range 0 2
+    depends on ZMK_STATUS_ADVERTISEMENT && ZMK_SPLIT
+    help
+      When CENTRAL_SIDE is "AUX", which peripheral index is the RIGHT
+      keyboard half. Default is 1 (second connected peripheral).
 
 config ZMK_STATUS_ADV_HALF_PERIPHERAL
     int "Peripheral index for the other keyboard half"
