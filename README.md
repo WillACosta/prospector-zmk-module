@@ -104,6 +104,19 @@ CONFIG_ZMK_STATUS_ADV_CENTRAL_SIDE="LEFT"
 
 The scanner is a standalone display device built with the `prospector_scanner` shield. It is referenced via `west.yml` in the config repository.
 
+### Scanner-Side Configuration
+
+Add to your scanner's `.conf` file:
+
+```conf
+# Optional: Enable/disable WPM (Words Per Minute) widget (default: y)
+CONFIG_PROSPECTOR_WPM_SUPPORT=n
+
+# Optional: Display active layer name instead of index number (default: n)
+# Requires ZMK keyboard to broadcast layer names (supported in v2.2.0+)
+CONFIG_PROSPECTOR_LAYER_NAMES_SUPPORT=y
+```
+
 ## Attribution
 
 Based on the original Prospector project:
