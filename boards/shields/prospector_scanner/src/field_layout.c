@@ -574,6 +574,31 @@ static void update_battery(uint8_t central, bool central_ok,
     lv_obj_set_style_text_color(battery_label, lv_color_hex(p->battery_text), LV_PART_MAIN);
 }
 
+static const char *get_profile_name(int profile) {
+    switch (profile) {
+        case 0: return CONFIG_PROSPECTOR_PROFILE_0_NAME;
+        case 1: return CONFIG_PROSPECTOR_PROFILE_1_NAME;
+        case 2: return CONFIG_PROSPECTOR_PROFILE_2_NAME;
+        case 3: return CONFIG_PROSPECTOR_PROFILE_3_NAME;
+        case 4: return CONFIG_PROSPECTOR_PROFILE_4_NAME;
+        default: return "?";
+    }
+}
+
+static void get_safe_profile_name(char *dest, const char *src, size_t dest_size) {
+    const size_t max_visible_len = 8;
+    size_t src_len = strlen(src);
+    if (src_len > max_visible_len) {
+        memcpy(dest, src, max_visible_len - 2);
+        dest[max_visible_len - 2] = '.';
+        dest[max_visible_len - 1] = '.';
+        dest[max_visible_len] = '\0';
+    } else {
+        strncpy(dest, src, dest_size - 1);
+        dest[dest_size - 1] = '\0';
+    }
+}
+
 static void update_output(bool usb_connected, uint8_t ble_profile, bool ble_connected) {
     if (!output_label) return;
     const field_color_palette_t *p = &color_palettes[current_palette];
@@ -583,7 +608,9 @@ static void update_output(bool usb_connected, uint8_t ble_profile, bool ble_conn
         lv_label_set_text_static(output_label, fl_stbuf_output);
         lv_obj_set_style_text_color(output_label, lv_color_hex(p->output_active), LV_PART_MAIN);
     } else {
-        snprintf(fl_stbuf_output, sizeof(fl_stbuf_output), "BLE %d", ble_profile);
+        char safe_name[16];
+        get_safe_profile_name(safe_name, get_profile_name(ble_profile), sizeof(safe_name));
+        snprintf(fl_stbuf_output, sizeof(fl_stbuf_output), "BLE %s", safe_name);
         lv_label_set_text_static(output_label, fl_stbuf_output);
         lv_obj_set_style_text_color(output_label,
             lv_color_hex(ble_connected ? p->output_active : p->output_inactive), LV_PART_MAIN);

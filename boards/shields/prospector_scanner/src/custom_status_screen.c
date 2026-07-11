@@ -1623,6 +1623,31 @@ void display_update_wpm(int wpm) {
     }
 }
 
+static const char *get_profile_name(int profile) {
+    switch (profile) {
+        case 0: return CONFIG_PROSPECTOR_PROFILE_0_NAME;
+        case 1: return CONFIG_PROSPECTOR_PROFILE_1_NAME;
+        case 2: return CONFIG_PROSPECTOR_PROFILE_2_NAME;
+        case 3: return CONFIG_PROSPECTOR_PROFILE_3_NAME;
+        case 4: return CONFIG_PROSPECTOR_PROFILE_4_NAME;
+        default: return "?";
+    }
+}
+
+static void get_safe_profile_name(char *dest, const char *src, size_t dest_size) {
+    const size_t max_visible_len = 8;
+    size_t src_len = strlen(src);
+    if (src_len > max_visible_len) {
+        memcpy(dest, src, max_visible_len - 2);
+        dest[max_visible_len - 2] = '.';
+        dest[max_visible_len - 1] = '.';
+        dest[max_visible_len] = '\0';
+    } else {
+        strncpy(dest, src, dest_size - 1);
+        dest[dest_size - 1] = '\0';
+    }
+}
+
 void display_update_connection(bool usb_rdy, bool ble_conn, bool ble_bond, int profile) {
     usb_ready = usb_rdy;
     ble_connected = ble_conn;
@@ -1635,12 +1660,12 @@ void display_update_connection(bool usb_rdy, bool ble_conn, bool ble_bond, int p
             /* USB connected - show USB only */
             snprintf(stbuf_transport, sizeof(stbuf_transport), "#ffffff USB#");
         } else {
-            /* USB not connected - show BLE with profile number on new line
+            /* USB not connected - show BLE with profile name on new line
              * BLE text colors:
              * - Green (00ff00): Connected
              * - Blue (4A90E2): Bonded but not connected (registered profile)
              * - White (ffffff): Not bonded (empty profile)
-             * Profile number: Always white
+             * Profile name: Always white, truncated if > 8 chars
              */
             const char *ble_color;
             if (ble_conn) {
@@ -1650,8 +1675,10 @@ void display_update_connection(bool usb_rdy, bool ble_conn, bool ble_bond, int p
             } else {
                 ble_color = "ffffff";  /* White - not bonded */
             }
+            char safe_name[16];
+            get_safe_profile_name(safe_name, get_profile_name(profile), sizeof(safe_name));
             snprintf(stbuf_transport, sizeof(stbuf_transport),
-                    "#%s BLE#\n#ffffff %d#", ble_color, profile);
+                    "#%s BLE#\n#ffffff %s#", ble_color, safe_name);
         }
         lv_label_set_text_static(transport_label, stbuf_transport);
     }
