@@ -123,6 +123,13 @@ CONFIG_PROSPECTOR_WPM_SUPPORT=n
 # Optional: Display active layer name instead of index number (default: n)
 # Requires ZMK keyboard to broadcast layer names (supported in v2.2.0+)
 CONFIG_PROSPECTOR_LAYER_NAMES_SUPPORT=y
+
+# Optional: Custom BLE connection profile names (default: slot numbers "0" to "4")
+CONFIG_PROSPECTOR_PROFILE_0_NAME="pers"
+CONFIG_PROSPECTOR_PROFILE_1_NAME="work"
+CONFIG_PROSPECTOR_PROFILE_2_NAME="ipad"
+CONFIG_PROSPECTOR_PROFILE_3_NAME="mac"
+CONFIG_PROSPECTOR_PROFILE_4_NAME="phone"
 ```
 
 ## Attribution

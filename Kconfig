@@ -284,6 +284,41 @@ config PROSPECTOR_MAX_LAYERS
       Automatically centers when fewer layers are configured.
       This setting only applies to scanner mode and is ignored for keyboard builds.
 
+config PROSPECTOR_PROFILE_0_NAME
+    string "Name for BLE profile slot 0"
+    default "0"
+    depends on PROSPECTOR_MODE_SCANNER
+    help
+      Custom label for BLE connection profile 0. Defaults to "0".
+
+config PROSPECTOR_PROFILE_1_NAME
+    string "Name for BLE profile slot 1"
+    default "1"
+    depends on PROSPECTOR_MODE_SCANNER
+    help
+      Custom label for BLE connection profile 1. Defaults to "1".
+
+config PROSPECTOR_PROFILE_2_NAME
+    string "Name for BLE profile slot 2"
+    default "2"
+    depends on PROSPECTOR_MODE_SCANNER
+    help
+      Custom label for BLE connection profile 2. Defaults to "2".
+
+config PROSPECTOR_PROFILE_3_NAME
+    string "Name for BLE profile slot 3"
+    default "3"
+    depends on PROSPECTOR_MODE_SCANNER
+    help
+      Custom label for BLE connection profile 3. Defaults to "3".
+
+config PROSPECTOR_PROFILE_4_NAME
+    string "Name for BLE profile slot 4"
+    default "4"
+    depends on PROSPECTOR_MODE_SCANNER
+    help
+      Custom label for BLE connection profile 4. Defaults to "4".
+
 config PROSPECTOR_LAYER_SLIDE_DEFAULT
     bool "Enable layer slide display mode by default"
     default n
