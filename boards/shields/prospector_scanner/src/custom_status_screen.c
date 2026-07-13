@@ -21,6 +21,7 @@
 #include <zephyr/sys/reboot.h>
 #include <zephyr/retention/bootmode.h>  /* For bootmode_set() - Zephyr 4.x bootloader entry */
 #include <zephyr/drivers/led.h>  /* For PWM backlight control */
+#include <zephyr/drivers/display.h>  /* For display blanking API */
 #include <string.h>
 #include <lvgl.h>
 #include <zmk/display.h>
@@ -86,6 +87,7 @@ static void create_keyboard_select_widgets(void);
 static void destroy_prospector_display_widgets(void);
 static void create_prospector_display_widgets(void);
 static void swipe_process_timer_cb(lv_timer_t *timer);
+static void auto_brightness_timer_cb(lv_timer_t *timer);
 
 /* Display update functions - called from pending_update_timer_cb */
 void display_update_device_name(const char *name);
@@ -176,15 +178,37 @@ static const struct device *backlight_dev = DEVICE_DT_GET(BACKLIGHT_NODE);
 static const struct device *backlight_dev = NULL;
 #endif
 
+static bool display_blanked = false;
+
+bool display_screen_is_blanked(void) {
+    return display_blanked;
+}
+
+void display_screen_wake(void);
+
 static void set_pwm_brightness(uint8_t brightness) {
     if (!backlight_dev || !device_is_ready(backlight_dev)) {
         LOG_WRN("Backlight device not ready");
         return;
     }
-    /* Ensure minimum brightness of 1% to prevent screen from going completely dark */
-    if (brightness < 1) {
-        brightness = 1;
+
+    const struct device *display_dev = DEVICE_DT_GET_OR_NULL(DT_CHOSEN(zephyr_display));
+    if (display_dev && device_is_ready(display_dev)) {
+        if (brightness == 0) {
+            display_blanking_on(display_dev);
+            display_blanked = true;
+        } else {
+            display_blanking_off(display_dev);
+            display_blanked = false;
+        }
+    } else {
+        if (brightness == 0) {
+            display_blanked = true;
+        } else {
+            display_blanked = false;
+        }
     }
+
     /* INVERT: Backlight circuit is inverted (100% PWM = dark, 0% = bright)
      * So we invert: user's 100% brightness → 0% PWM duty, 1% brightness → 99% PWM */
     uint8_t pwm_value = 100 - brightness;
@@ -527,11 +551,17 @@ static void pending_update_timer_cb(lv_timer_t *timer) {
 
             /* Apply timeout brightness if configured */
 #ifdef CONFIG_PROSPECTOR_SCANNER_TIMEOUT_BRIGHTNESS
-            if (CONFIG_PROSPECTOR_SCANNER_TIMEOUT_BRIGHTNESS > 0) {
-                set_pwm_brightness(CONFIG_PROSPECTOR_SCANNER_TIMEOUT_BRIGHTNESS);
-                LOG_INF("Timeout brightness set to %d%%", CONFIG_PROSPECTOR_SCANNER_TIMEOUT_BRIGHTNESS);
+            set_pwm_brightness(CONFIG_PROSPECTOR_SCANNER_TIMEOUT_BRIGHTNESS);
+            LOG_INF("Timeout brightness set to %d%%", CONFIG_PROSPECTOR_SCANNER_TIMEOUT_BRIGHTNESS);
+            if (CONFIG_PROSPECTOR_SCANNER_TIMEOUT_BRIGHTNESS == 0) {
+                display_blanked = true;
+                const struct device *display_dev = DEVICE_DT_GET_OR_NULL(DT_CHOSEN(zephyr_display));
+                if (display_dev && device_is_ready(display_dev)) {
+                    display_blanking_on(display_dev);
+                }
             }
 #endif
+            zmk_status_scanner_set_low_power(true);
             return;
         }
 
@@ -544,10 +574,25 @@ static void pending_update_timer_cb(lv_timer_t *timer) {
             active_battery_count = -1;  /* Force reposition on next battery update */
 
             /* Restore normal brightness when keyboard activity resumes */
-#ifdef CONFIG_PROSPECTOR_FIXED_BRIGHTNESS
-            set_pwm_brightness(CONFIG_PROSPECTOR_FIXED_BRIGHTNESS);
-            LOG_INF("Brightness restored to %d%%", CONFIG_PROSPECTOR_FIXED_BRIGHTNESS);
-#endif
+            if (display_blanked) {
+                display_blanked = false;
+                const struct device *display_dev = DEVICE_DT_GET_OR_NULL(DT_CHOSEN(zephyr_display));
+                if (display_dev && device_is_ready(display_dev)) {
+                    display_blanking_off(display_dev);
+                }
+                zmk_status_scanner_set_low_power(false);
+            }
+
+            if (ds_auto_brightness_enabled && brightness_control_sensor_available()) {
+                if (auto_brightness_timer) {
+                    auto_brightness_timer_cb(NULL);
+                } else {
+                    set_pwm_brightness(ds_manual_brightness);
+                }
+            } else {
+                set_pwm_brightness(ds_manual_brightness);
+            }
+            LOG_INF("Brightness restored to active setting");
         }
 
         if (current_screen == SCREEN_PROSPECTOR_DISPLAY) {
@@ -2320,6 +2365,10 @@ static void ds_custom_slider_drag_cb(lv_event_t *e) {
 static void auto_brightness_timer_cb(lv_timer_t *timer) {
     ARG_UNUSED(timer);
 
+    if (display_blanked) {
+        return;
+    }
+
     if (!ds_auto_brightness_enabled || !brightness_control_sensor_available()) {
         return;
     }
@@ -3741,3 +3790,31 @@ static int swipe_gesture_listener(const zmk_event_t *eh) {
 
 ZMK_LISTENER(swipe_gesture, swipe_gesture_listener);
 ZMK_SUBSCRIPTION(swipe_gesture, zmk_swipe_gesture_event);
+
+void display_screen_wake(void) {
+    if (!display_blanked) {
+        return;
+    }
+    LOG_INF("Waking display screen from touch event");
+    display_blanked = false;
+    
+    // Unblank display panel
+    const struct device *display_dev = DEVICE_DT_GET_OR_NULL(DT_CHOSEN(zephyr_display));
+    if (display_dev && device_is_ready(display_dev)) {
+        display_blanking_off(display_dev);
+    }
+    
+    // Restore brightness based on auto or manual setting
+    if (ds_auto_brightness_enabled && brightness_control_sensor_available()) {
+        if (auto_brightness_timer) {
+            auto_brightness_timer_cb(NULL);
+        } else {
+            set_pwm_brightness(ds_manual_brightness);
+        }
+    } else {
+        set_pwm_brightness(ds_manual_brightness);
+    }
+    
+    // Switch BLE scanner back to active scanning
+    zmk_status_scanner_set_low_power(false);
+}

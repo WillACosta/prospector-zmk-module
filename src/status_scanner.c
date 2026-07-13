@@ -271,6 +271,42 @@ int zmk_status_scanner_get_primary_keyboard(void) {
     return primary;
 }
 
+int zmk_status_scanner_set_low_power(bool low_power) {
+    if (!scanning) {
+        return -EINVAL;
+    }
+
+    int err = bt_le_scan_stop();
+    if (err) {
+        LOG_ERR("Failed to stop scan for mode switch: %d", err);
+        return err;
+    }
+
+    struct bt_le_scan_param scan_param = {
+        .options = BT_LE_SCAN_OPT_NONE,
+    };
+
+    if (low_power) {
+        scan_param.type = BT_LE_SCAN_TYPE_PASSIVE;
+        scan_param.interval = 960; // 600ms
+        scan_param.window = 48;    // 30ms
+        LOG_INF("Scanner low-power scan started (~5%% duty cycle)");
+    } else {
+        scan_param.type = BT_LE_SCAN_TYPE_ACTIVE;
+        scan_param.interval = BT_GAP_SCAN_FAST_WINDOW;
+        scan_param.window = BT_GAP_SCAN_FAST_WINDOW;
+        LOG_INF("Scanner high-power active scan restored (100%% duty cycle)");
+    }
+
+    err = bt_le_scan_start(&scan_param, scan_callback);
+    if (err) {
+        LOG_ERR("Failed to start scanning in set_low_power: %d", err);
+        return err;
+    }
+
+    return 0;
+}
+
 SYS_INIT(zmk_status_scanner_init, APPLICATION, 99);
 
 #endif /* CONFIG_PROSPECTOR_MODE_SCANNER */

@@ -360,7 +360,7 @@ config PROSPECTOR_SCANNER_MAIN_LOOP_INTERVAL_MS
 
 config PROSPECTOR_SCANNER_TIMEOUT_BRIGHTNESS
     int "Display brightness during timeout (percentage)"
-    range 1 50
+    range 0 50
     default 1
     depends on PROSPECTOR_MODE_SCANNER
     help

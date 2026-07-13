@@ -111,6 +111,14 @@ int zmk_status_scanner_get_active_count(void);
  */
 int zmk_status_scanner_get_primary_keyboard(void);
 
+/**
+ * @brief Set the scanner to low power scanning mode (duty-cycled passive scan)
+ * 
+ * @param low_power True to enable low-power scan, false for 100% active scan
+ * @return 0 on success, negative error code on failure
+ */
+int zmk_status_scanner_set_low_power(bool low_power);
+
 #ifdef __cplusplus
 }
 #endif

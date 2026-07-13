@@ -260,6 +260,9 @@ INPUT_CALLBACK_DEFINE(DEVICE_DT_GET(TOUCH_NODE), touch_input_callback, NULL);
 // - Display logical: 280 x 240 (landscape, rotated 90° via ST7789V mdac)
 // - Touch Y (0-279) → Display X (0-279) - direct mapping, NO inversion
 // - Touch X (0-239) → Display Y (239-0) - inverted
+extern bool display_screen_is_blanked(void);
+extern void display_screen_wake(void);
+
 static void lvgl_input_read(lv_indev_t *indev, lv_indev_data_t *data) {
     ARG_UNUSED(indev);
 
@@ -277,7 +280,15 @@ static void lvgl_input_read(lv_indev_t *indev, lv_indev_data_t *data) {
 
     data->point.x = logical_x;
     data->point.y = logical_y;
-    data->state = touch_active ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
+
+    if (display_screen_is_blanked()) {
+        if (touch_active) {
+            display_screen_wake();
+        }
+        data->state = LV_INDEV_STATE_RELEASED;
+    } else {
+        data->state = touch_active ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
+    }
 
     // Debug: Log when LVGL reads touch state (reduced frequency)
     static uint32_t last_log_time = 0;
